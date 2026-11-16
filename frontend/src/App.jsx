@@ -13,6 +13,8 @@ import CreatorsScreen from "./screens/CreatorsScreen";
 import CreatorDetailScreen from "./screens/CreatorDetailScreen";
 import CreatorCreateScreen from "./screens/CreatorCreateScreen";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   return (
@@ -79,6 +81,8 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </SessionManager>
+      <ToastContainer position="top-right" autoClose={4000} newestOnTop />
+
     </Router>
   );
 }

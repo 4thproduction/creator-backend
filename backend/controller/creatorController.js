@@ -21,6 +21,22 @@ const normalizeFile = (file, field) => {
   return { name: file.name, type: file.type, data };
 };
 
+const findDuplicate = async ({ email, mobile }, excludeId) => {
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const normalizedMobile = mobile === undefined || mobile === null ? '' : String(mobile).trim();
+  const conditions = [];
+  if (normalizedEmail) conditions.push({ email: normalizedEmail });
+  if (normalizedMobile) conditions.push({ mobile: normalizedMobile });
+  if (!conditions.length) return null;
+  const query = { $or: conditions };
+  if (excludeId) query._id = { $ne: excludeId };
+  const existing = await Creator.findOne(query).select('email mobile').lean();
+  if (!existing) return null;
+  return existing.email === normalizedEmail
+    ? 'A creator with this email already exists'
+    : 'A creator with this mobile number already exists';
+};
+
 const createCreator = async (req, res) => {
   try {
     const payload = { ...req.body };
@@ -35,6 +51,8 @@ const createCreator = async (req, res) => {
       return res.status(422).json({ message: 'All consent fields must be accepted' });
     }
     for (const field of FILE_FIELDS) payload[field] = normalizeFile(payload[field], field);
+    const duplicate = await findDuplicate(payload);
+    if (duplicate) return res.status(409).json({ message: duplicate });
 
     const creator = await Creator.create(payload);
     return res.status(201).json({ id: creator._id, message: 'Application received' });
@@ -68,6 +86,8 @@ const updateCreator = async (req, res) => {
     if (![payload.consent1, payload.consent2, payload.consent3].every((value) => value === true)) {
       return res.status(422).json({ message: 'All consent fields must be accepted' });
     }
+    const duplicate = await findDuplicate(payload, creator._id);
+    if (duplicate) return res.status(409).json({ message: duplicate });
     for (const field of FILE_FIELDS) {
       if (payload[field]) payload[field] = normalizeFile(payload[field], field);
       else delete payload[field];
@@ -122,19 +142,120 @@ const makeExcel = (creators) => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Creators"><Table>${rows.map((row) => `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${xmlEscape(cell)}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;
 };
 
+// PDF columns mirror the Creators table in the admin UI (minus the Actions column).
+const PLATFORMS = [['Instagram', 'igLink', 'igFollowers'], ['YouTube', 'ytLink', 'ytSubs'], ['Facebook', 'fbLink', 'fbFollowers'], ['LinkedIn', 'liLink', 'liFollowers']];
+const parseMetric = (value) => {
+  const match = String(value ?? '').replace(/[,\s%]/g, '').match(/^(\d+(?:\.\d+)?)([KMLB])?$/i);
+  return match ? Number(match[1]) * ({ K: 1e3, L: 1e5, M: 1e6, B: 1e9 }[match[2]?.toUpperCase()] || 1) : null;
+};
+const compactNumber = (value) => (value === null ? '-' : new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value));
+const activePlatforms = (c) => PLATFORMS.filter(([, link]) => String(c[link] ?? '').trim());
+const totalFollowers = (c) => {
+  const values = activePlatforms(c).map(([, , field]) => parseMetric(c[field])).filter((value) => value !== null);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+};
+const titleCase = (value = '') => String(value).trim().replace(/\s+/g, ' ').toLocaleLowerCase().replace(/(^|[\s'-])\p{L}/gu, (letter) => letter.toLocaleUpperCase());
+
+const PDF_COLUMNS = [
+  { title: 'S.No.', width: 34, value: (c, i) => String(i + 1) },
+  { title: 'Creator', width: 95, value: (c) => titleCase(c.fullName) || '-' },
+  { title: 'Contact', width: 72, value: (c) => c.mobile || '-' },
+  { title: 'Email', width: 125, value: (c) => c.email || '-' },
+  { title: 'Category', width: 94, value: (c) => (Array.isArray(c.category) ? c.category.join(', ') : c.category) || '-' },
+  { title: 'City', width: 62, value: (c) => c.city || '-' },
+  { title: 'Platforms', width: 100, value: (c) => activePlatforms(c).map(([name]) => name).join(', ') || '-' },
+  { title: 'Followers', width: 58, value: (c) => compactNumber(totalFollowers(c)) },
+  { title: 'Engagement', width: 62, value: (c) => { const v = parseMetric(c.engagement); return v === null ? '-' : `${v.toFixed(1)}%`; } },
+  { title: 'Avg. reel views', width: 78, value: (c) => compactNumber(parseMetric(c.avgReel)) },
+];
+const PDF_PAGE = { width: 842, height: 595, margin: 30 }; // A4 landscape
+const PDF_FONT_SIZE = 8;
+const PDF_LINE_HEIGHT = 10;
+const PDF_CELL_PADDING = 5;
+
+// Wrap text to fit a column (Helvetica averages <= 0.55em per glyph), breaking on spaces/commas/@ where possible.
+const wrapText = (value, width, fontSize = PDF_FONT_SIZE) => {
+  const maxChars = Math.max(Math.floor((width - PDF_CELL_PADDING * 2) / (fontSize * 0.55)), 1);
+  const lines = [];
+  let rest = String(value ?? '');
+  while (rest.length > maxChars) {
+    const slice = rest.slice(0, maxChars + 1);
+    const breakAt = Math.max(slice.lastIndexOf(' '), slice.lastIndexOf(','), slice.lastIndexOf('@') - 1);
+    const cut = breakAt > 0 ? breakAt + 1 : maxChars;
+    lines.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  lines.push(rest);
+  return lines;
+};
+
 const makePdf = (creators) => {
-  const pages = [];
-  const lines = creators.map((creator, index) => `${index + 1}. ${creator.fullName || ''} | ${creator.email || ''} | ${creator.mobile || ''}`);
-  for (let i = 0; i < Math.max(lines.length, 1); i += 48) pages.push(lines.slice(i, i + 48));
-  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+  const { width: pageWidth, height: pageHeight, margin } = PDF_PAGE;
+  const tableWidth = PDF_COLUMNS.reduce((sum, column) => sum + column.width, 0);
+  const tableTop = pageHeight - margin - 34;
+  const tableFloor = margin + 12;
+
+  const toRow = (cells) => {
+    const wrapped = cells.map((cell, index) => wrapText(cell, PDF_COLUMNS[index].width));
+    return { wrapped, height: Math.max(...wrapped.map((lines) => lines.length)) * PDF_LINE_HEIGHT + 8 };
+  };
+  const header = toRow(PDF_COLUMNS.map((column) => column.title));
+  const rows = creators.map((creator, index) => toRow(PDF_COLUMNS.map((column) => column.value(creator, index))));
+
+  const pages = [[]];
+  let used = header.height;
+  rows.forEach((row) => {
+    if (used + row.height > tableTop - tableFloor && pages[pages.length - 1].length) { pages.push([]); used = header.height; }
+    pages[pages.length - 1].push(row);
+    used += row.height;
+  });
+
+  const textAt = (font, size, x, y, text) => `BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(text)}) Tj ET`;
+  const drawRow = (top, row, font, fill) => {
+    const ops = [];
+    if (fill) ops.push(`${fill} rg ${margin} ${top - row.height} ${tableWidth} ${row.height} re f`);
+    ops.push('0.11 0.1 0.09 rg');
+    let x = margin;
+    PDF_COLUMNS.forEach((column, index) => {
+      row.wrapped[index].forEach((line, lineIndex) => ops.push(textAt(font, PDF_FONT_SIZE, x + PDF_CELL_PADDING, top - 11 - lineIndex * PDF_LINE_HEIGHT, line)));
+      x += column.width;
+    });
+    ops.push('0.8 G 0.5 w', `${margin} ${top - row.height} m ${margin + tableWidth} ${top - row.height} l S`);
+    return ops;
+  };
+
+  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'];
   const pageIds = [];
-  for (const [index, pageLines] of pages.entries()) {
+  const generated = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  for (const [pageIndex, pageRows] of pages.entries()) {
+    const ops = [
+      textAt('F2', 16, margin, pageHeight - margin - 12, 'Creators'),
+      '0.4 g',
+      textAt('F1', 9, margin, pageHeight - margin - 26, `${creators.length} record${creators.length === 1 ? '' : 's'} | Generated ${generated} IST`),
+      '0.8 G 0.5 w', `${margin} ${tableTop} m ${margin + tableWidth} ${tableTop} l S`,
+    ];
+    let top = tableTop;
+    ops.push(...drawRow(top, header, 'F2', '0.91 0.89 0.85'));
+    top -= header.height;
+    pageRows.forEach((row, rowIndex) => {
+      ops.push(...drawRow(top, row, 'F1', rowIndex % 2 ? '0.97 0.96 0.94' : null));
+      top -= row.height;
+    });
+    if (!pageRows.length) {
+      const empty = { wrapped: [['No creators match the selected filters.']], height: 22 };
+      ops.push('0.4 g', textAt('F1', PDF_FONT_SIZE, margin + PDF_CELL_PADDING, top - 14, empty.wrapped[0][0]), '0.8 G 0.5 w', `${margin} ${top - empty.height} m ${margin + tableWidth} ${top - empty.height} l S`);
+      ops.push(`${margin} ${tableTop} m ${margin} ${top - empty.height} l S`, `${margin + tableWidth} ${tableTop} m ${margin + tableWidth} ${top - empty.height} l S`);
+    } else {
+      let x = margin;
+      [x, ...PDF_COLUMNS.map((column) => (x += column.width))].forEach((edge) => ops.push(`${edge} ${tableTop} m ${edge} ${top} l S`));
+    }
+    ops.push('0.4 g', textAt('F1', 8, pageWidth - margin - 55, margin - 10, `Page ${pageIndex + 1} of ${pages.length}`));
+
+    const content = ops.join('\n');
     const pageId = objects.length + 1;
-    const streamId = pageId + 1;
     pageIds.push(pageId);
-    const text = ['BT /F1 14 Tf 40 800 Td (Creators) Tj', '/F1 9 Tf', ...pageLines.map((line) => `0 -15 Td (${pdfEscape(line.slice(0, 110))}) Tj`), `0 -20 Td (Page ${index + 1} of ${pages.length}) Tj ET`].join('\n');
-    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamId} 0 R >>`);
-    objects.push(`<< /Length ${Buffer.byteLength(text)} >>\nstream\n${text}\nendstream`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${pageId + 1} 0 R >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`);
   }
   objects[1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
   let pdf = '%PDF-1.4\n';

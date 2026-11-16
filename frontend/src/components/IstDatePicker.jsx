@@ -3,7 +3,7 @@ import { toApiDate } from "../utils/istDates";
 
 export default function IstDatePicker({ value, onChange, label, min, max }) {
   return (
-    <span className="relative inline-flex h-10 w-40 items-center justify-between gap-2 rounded-xl border border-[#ded7c9] bg-white px-3 text-sm text-stone-700 focus-within:ring-2 focus-within:ring-[#aa8241]">
+    <span className="relative inline-flex h-10 w-32 items-center justify-between gap-2 rounded-xl border border-[#ded7c9] bg-white px-3 text-sm text-stone-700 focus-within:ring-2 focus-within:ring-[#aa8241]">
       <span aria-hidden="true">{value || "dd/mm/yy"}</span>
       <CalendarDays
         aria-hidden="true"

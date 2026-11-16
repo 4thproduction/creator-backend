@@ -32,3 +32,14 @@ h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.025
   .portal-content { padding: 1.5rem; }
   .portal-shell:has(.portal-sidebar.is-collapsed) .portal-main { margin-left: 0; }
 }
+
+/* Native selects: replace the browser arrow (which sits flush against the border) with a padded chevron. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+}

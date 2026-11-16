@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Upload,
 } from "lucide-react";
 import {
   FormControl,
@@ -27,6 +28,8 @@ import { toApiDate } from "../utils/istDates";
 import IstDatePicker from "../components/IstDatePicker";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
+import ImportCreatorsModal from "../components/ImportCreatorsModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const columns = [
   "Serial No.",
@@ -90,8 +93,10 @@ const CreatorsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [downloadAnchor, setDownloadAnchor] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [filters, setFilters] = useState({
     platform: "",
@@ -169,8 +174,6 @@ const CreatorsScreen = () => {
   }, [loadCreators]);
 
   const remove = async (creator) => {
-    if (!window.confirm(`Delete ${creator.fullName}? This cannot be undone.`))
-      return;
     setBusyId(creator._id);
     setError("");
     try {
@@ -183,6 +186,7 @@ const CreatorsScreen = () => {
       );
     } finally {
       setBusyId(null);
+      setPendingDelete(null);
     }
   };
 
@@ -219,59 +223,9 @@ const CreatorsScreen = () => {
       <div className="portal-main ml-0 flex min-w-0 flex-1 flex-col md:ml-72">
         <Navbar title="Creators" />
         <main className="portal-content flex-1 p-4 md:p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-stone-500">
-              {total} creator{total === 1 ? "" : "s"} matching
-            </p>
-            <div className="flex items-center gap-2">
-              {permissions.includes("create_creator") && (
-                <Link to="/creators/new" className="portal-button text-sm">
-                  <Plus className="h-4 w-4" /> Add Creator
-                </Link>
-              )}
-              {permissions.includes("export_creator") && (
-                <div>
-                  <button
-                    type="button"
-                    disabled={exporting || !validRange || loading}
-                    onClick={(event) => setDownloadAnchor(event.currentTarget)}
-                    aria-label="Download creators"
-                    title="Download"
-                    aria-haspopup="menu"
-                    aria-expanded={Boolean(downloadAnchor)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-stone-300 bg-white text-stone-700 transition-colors hover:bg-stone-100 disabled:opacity-50"
-                  >
-                    <Download className="h-5 w-5" />
-                  </button>
-                  <Menu
-                    anchorEl={downloadAnchor}
-                    open={Boolean(downloadAnchor)}
-                    onClose={() => setDownloadAnchor(null)}
-                  >
-                    <MenuItem
-                      onClick={() => {
-                        setDownloadAnchor(null);
-                        exportFile("excel");
-                      }}
-                      className="!gap-2"
-                    >
-                      <FileSpreadsheet className="h-4 w-4 text-green-700" />{" "}
-                      Excel
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => {
-                        setDownloadAnchor(null);
-                        exportFile("pdf");
-                      }}
-                      className="!gap-2"
-                    >
-                      <FileText className="h-4 w-4 text-red-700" /> PDF
-                    </MenuItem>
-                  </Menu>
-                </div>
-              )}
-            </div>
-          </div>
+          <p className="mb-3 text-sm text-stone-500">
+            {total} creator{total === 1 ? "" : "s"} matching
+          </p>
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <input
               type="search"
@@ -348,14 +302,63 @@ const CreatorsScreen = () => {
                 </label>
               </>
             )}
+            <div className="ml-auto flex items-center gap-2">
+              {permissions.includes("create_creator") && (
+                <Link to="/creators/new" className="portal-button text-sm">
+                  <Plus className="h-4 w-4" /> Add Creator
+                </Link>
+              )}
+              {permissions.includes("create_creator") && (
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100"
+                >
+                  <Upload className="h-4 w-4" /> Import
+                </button>
+              )}
+              {permissions.includes("export_creator") && (
+                <div>
+                  <button
+                    type="button"
+                    disabled={exporting || !validRange || loading}
+                    onClick={(event) => setDownloadAnchor(event.currentTarget)}
+                    aria-haspopup="menu"
+                    aria-expanded={Boolean(downloadAnchor)}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" /> Export
+                  </button>
+                  <Menu
+                    anchorEl={downloadAnchor}
+                    open={Boolean(downloadAnchor)}
+                    onClose={() => setDownloadAnchor(null)}
+                  >
+                    <MenuItem
+                      onClick={() => {
+                        setDownloadAnchor(null);
+                        exportFile("excel");
+                      }}
+                      className="!gap-2"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-green-700" />{" "}
+                      Excel
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => {
+                        setDownloadAnchor(null);
+                        exportFile("pdf");
+                      }}
+                      className="!gap-2"
+                    >
+                      <FileText className="h-4 w-4 text-red-700" /> PDF
+                    </MenuItem>
+                  </Menu>
+                </div>
+              )}
+            </div>
           </div>
  
-          {!validRange && (
-            <p role="alert" className="mb-3 text-sm text-red-700">
-              Enter valid dates in dd/mm/yy format, with the start on or before
-              the end.
-            </p>
-          )}
           {error && (
             <p
               role="alert"
@@ -453,7 +456,7 @@ const CreatorsScreen = () => {
                             <button
                               type="button"
                               disabled={busyId === creator._id}
-                              onClick={() => remove(creator)}
+                              onClick={() => setPendingDelete(creator)}
                               aria-label={`Delete ${creator.fullName}`}
                               title="Delete"
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
@@ -517,6 +520,31 @@ const CreatorsScreen = () => {
             </nav>
           </div>
         </main>
+        <ConfirmModal
+          open={Boolean(pendingDelete)}
+          title="Delete creator?"
+          message={
+            pendingDelete && (
+              <>
+                <strong className="text-stone-900">
+                  {pendingDelete.fullName}
+                </strong>{" "}
+                will be permanently deleted. This cannot be undone.
+              </>
+            )
+          }
+          busy={Boolean(pendingDelete) && busyId === pendingDelete._id}
+          onConfirm={() => remove(pendingDelete)}
+          onClose={() => setPendingDelete(null)}
+        />
+        <ImportCreatorsModal
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
+            setPage(1);
+            loadCreators();
+          }}
+        />
       </div>
     </div>
   );
