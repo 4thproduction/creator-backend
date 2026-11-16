@@ -137,12 +137,20 @@ const CreatorsScreen = () => {
         },
       });
       if (id !== requestId.current) return;
+      if (!data || !Array.isArray(data.creators)) {
+        // Usually means the API URL returned an HTML page (e.g. nginx not
+        // routing /portal/api to the backend) instead of JSON.
+        setCreators([]);
+        setTotal(0);
+        setError("Unexpected response from server. Check the API routing.");
+        return;
+      }
       setOptions({
         categories: data.categories || [],
         cities: data.cities || [],
       });
       setCreators(data.creators);
-      setTotal(data.total);
+      setTotal(data.total || 0);
     } catch (requestError) {
       if (id === requestId.current)
         setError(
