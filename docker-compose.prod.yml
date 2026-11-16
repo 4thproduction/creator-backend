@@ -1,0 +1,52 @@
+# Production stack for https://creator.cultmkt.com/portal
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Host ports are bound to 127.0.0.1 only; the host nginx proxies to them.
+services:
+  mongodb:
+    image: mongo:6
+    container_name: creator_portal_mongo
+    restart: unless-stopped
+    volumes:
+      - creator_portal_mongo_data:/data/db
+    networks:
+      - creator_portal
+
+  backend:
+    build: ./backend
+    container_name: creator_portal_backend
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    env_file:
+      - ./backend/.env
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/creator_portal
+      - NODE_ENV=production
+      - COOKIE_PATH=/portal/api
+      - PORT=5000
+    ports:
+      - "127.0.0.1:5023:5000"
+    networks:
+      - creator_portal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_BASE_PATH: /portal/
+        VITE_API_URL: /portal
+    container_name: creator_portal_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3023:80"
+    networks:
+      - creator_portal
+
+networks:
+  creator_portal:
+
+volumes:
+  creator_portal_mongo_data:

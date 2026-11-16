@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { font-family: 'Inter', system-ui, sans-serif; color: #302a27; background: #faf8f2; font-synthesis: none; }
+body { margin: 0; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+h1, h2, h3, h4 { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.025em; }
+::selection { background: #e8d5a9; color: #302a27; }
+
+.portal-shell { min-height: 100vh; background: #faf8f2; }
+.portal-main { min-width: 0; transition: margin-left .3s ease-in-out; }
+.portal-shell:has(.portal-sidebar.is-collapsed) .portal-main { margin-left: 5rem; }
+.portal-content { width: 100%; min-width: 0; }
+.portal-card { background: #fff; border: 1px solid #e9e4d9; border-radius: 1.5rem; box-shadow: 0 14px 42px -32px rgba(48, 42, 39, .38); }
+.portal-hero { background: radial-gradient(circle at 85% 15%, rgba(205, 164, 88, .25), transparent 40%), linear-gradient(125deg, #faf7ee, #f3eee3); }
+.portal-input { width: 100%; border: 1px solid #ded7c9; border-radius: .85rem; padding: .8rem 1rem; background: #fff; color: #302a27; outline: none; transition: border-color .2s, box-shadow .2s; }
+.portal-input:focus { border-color: #bd9350; box-shadow: 0 0 0 3px rgba(189, 147, 80, .16); }
+.portal-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .85rem; background: #302a27; padding: .8rem 1.15rem; color: #fff; font-weight: 600; transition: background .2s, transform .2s; }
+.portal-button:hover { background: #4c3f34; transform: translateY(-1px); }
+.portal-button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.portal-outline-button { border: 1px solid #ded7c9; border-radius: .85rem; color: #302a27; background: white; padding: .7rem 1rem; }
+.portal-outline-button:hover { background: #faf8f2; }
+.portal-table-wrap { overflow-x: auto; }
+.portal-table { min-width: 560px; width: 100%; }
+.portal-table thead { background: #faf8f2; }
+.portal-table tbody tr:hover { background: #fdfbf7; }
+.portal-table th { color: #796f65; }
+.portal-table td, .portal-table th { border-color: #eee9df; }
+@media (max-width: 767px) {
+  .portal-content { padding: 1.5rem; }
+  .portal-shell:has(.portal-sidebar.is-collapsed) .portal-main { margin-left: 0; }
+}

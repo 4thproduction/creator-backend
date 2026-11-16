@@ -1,0 +1,297 @@
+import { useState, useEffect } from 'react'
+import { FormControl, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useDispatch, useSelector } from 'react-redux'
+import { listRoles, createRole, updateRole, deleteRole } from '../actions/roleActions'
+import {
+  ROLE_CREATE_RESET,
+  ROLE_UPDATE_RESET,
+  ROLE_DELETE_RESET,
+} from '../constants/roleConstants'
+import { AUTH_LOGIN_SUCCESS } from '../constants/authConstants'
+import Sidebar from '../components/Sidebar'
+import Navbar from '../components/Navbar'
+import PermissionCheckbox from '../components/PermissionCheckbox'
+
+const Modal = ({ title, onClose, onSubmit, loading, error, children }) => (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+    <div className="portal-card shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-lg font-semibold text-stone-800">{title}</h3>
+        <button
+          onClick={onClose}
+          className="text-stone-400 hover:text-stone-600 transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+          {error}
+        </div>
+      )}
+      <form onSubmit={onSubmit} className="space-y-4">
+        {children}
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-stone-300 text-stone-700 rounded-lg hover:bg-[#faf8f2] text-sm transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="portal-button flex-1 text-sm"
+          >
+            {loading ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)
+
+const RolesScreen = () => {
+  const dispatch = useDispatch()
+
+  const { userInfo } = useSelector((state) => state.auth)
+  const permissions = userInfo?.user?.role?.permissions || []
+
+  const { roles, total, loading: listLoading, error: listError } = useSelector((state) => state.roleList)
+  const { success: createSuccess, loading: createLoading, error: createError } = useSelector(
+    (state) => state.roleCreate
+  )
+  const {
+    success: updateSuccess,
+    loading: updateLoading,
+    error: updateError,
+    role: updatedRoleData,
+  } = useSelector((state) => state.roleUpdate)
+  const { success: deleteSuccess } = useSelector((state) => state.roleDelete)
+
+  const [showCreate, setShowCreate] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const [selectedRole, setSelectedRole] = useState(null)
+  const [form, setForm] = useState({ name: '', permissions: [] })
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+
+  useEffect(() => {
+    dispatch(listRoles(page, limit))
+  }, [dispatch, page, limit])
+
+  useEffect(() => {
+    if (createSuccess) {
+      setShowCreate(false)
+      setForm({ name: '', permissions: [] })
+      dispatch({ type: ROLE_CREATE_RESET })
+      if (page !== 1) setPage(1)
+      else dispatch(listRoles(page, limit))
+    }
+  }, [createSuccess, dispatch, page, limit])
+
+  useEffect(() => {
+    if (updateSuccess) {
+      // If the updated role is the currently logged-in user's role,
+      // Sync the new permissions into the current in-memory user.
+      if (updatedRoleData && userInfo?.user?.role?._id === updatedRoleData._id) {
+        const refreshedUserInfo = {
+          ...userInfo,
+          user: { ...userInfo.user, role: updatedRoleData },
+        }
+        dispatch({ type: AUTH_LOGIN_SUCCESS, payload: refreshedUserInfo })
+      }
+      setShowEdit(false)
+      setSelectedRole(null)
+      dispatch({ type: ROLE_UPDATE_RESET })
+      dispatch(listRoles(page, limit))
+    }
+  }, [updateSuccess, dispatch, page, limit, updatedRoleData, userInfo])
+
+  useEffect(() => {
+    if (deleteSuccess) {
+      dispatch({ type: ROLE_DELETE_RESET })
+      if (roles.length === 1 && page > 1) setPage(page - 1)
+      else dispatch(listRoles(page, limit))
+    }
+  }, [deleteSuccess, dispatch, page, limit, roles.length])
+
+  const openEdit = (role) => {
+    setSelectedRole(role)
+    setForm({ name: role.name, permissions: role.permissions || [] })
+    setShowEdit(true)
+  }
+
+  const handleCreate = (e) => {
+    e.preventDefault()
+    dispatch(createRole(form))
+  }
+
+  const handleUpdate = (e) => {
+    e.preventDefault()
+    dispatch(updateRole(selectedRole._id, form))
+  }
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this role?')) {
+      dispatch(deleteRole(id))
+    }
+  }
+
+  const closeCreate = () => {
+    setShowCreate(false)
+    dispatch({ type: ROLE_CREATE_RESET })
+  }
+
+  const closeEdit = () => {
+    setShowEdit(false)
+    dispatch({ type: ROLE_UPDATE_RESET })
+  }
+
+  return (
+    <div className="portal-shell flex">
+      <Sidebar />
+      <div className="portal-main ml-0 flex flex-1 flex-col md:ml-72">
+        <Navbar title="Roles" />
+        <div className="portal-content flex-1 p-4 md:p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-stone-500">
+              {total} role{total !== 1 ? 's' : ''} total
+            </p>
+            {permissions.includes('create_role') && (
+              <button
+                onClick={() => setShowCreate(true)}
+                className="portal-button text-sm"
+              >
+                <Plus className="h-4 w-4" />
+                Add Role
+              </button>
+            )}
+          </div>
+
+          {listError && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{listError}</p>}
+
+          <TableContainer className="overflow-x-auto rounded-xl border border-stone-300 bg-white shadow-sm">
+            <Table aria-label="Roles" className="min-w-[560px] border-collapse">
+              <TableHead className="bg-stone-100">
+                <TableRow>
+                  <TableCell className="!w-24 !whitespace-nowrap !border-b !border-stone-300 !px-4 !py-3 !text-xs !font-bold !uppercase !tracking-wide !text-stone-700">Serial No.</TableCell>
+                  <TableCell className="!border-b !border-stone-300 !px-4 !py-3 !text-xs !font-bold !uppercase !tracking-wide !text-stone-700">Role Name</TableCell>
+                  <TableCell className="!border-b !border-stone-300 !px-4 !py-3 !text-xs !font-bold !uppercase !tracking-wide !text-stone-700">Permissions</TableCell>
+                  {(permissions.includes('update_role') || permissions.includes('delete_role')) && (
+                    <TableCell align="right" className="!border-b !border-stone-300 !px-4 !py-3 !text-xs !font-bold !uppercase !tracking-wide !text-stone-700">Actions</TableCell>
+                  )}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {listLoading || roles.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={permissions.includes('update_role') || permissions.includes('delete_role') ? 4 : 3} align="center" className="!border-stone-300 !py-10 !text-sm !text-stone-500">
+                      {listLoading ? 'Loading...' : 'No roles found. Create one to get started.'}
+                    </TableCell>
+                  </TableRow>
+                ) : roles.map((role, index) => (
+                  <TableRow key={role._id} className="hover:bg-stone-50">
+                    <TableCell className="!border-stone-300 !px-4 !py-3 !text-sm !text-stone-600">{(page - 1) * limit + index + 1}</TableCell>
+                    <TableCell className="!border-stone-300 !px-4 !py-3 !text-sm !font-medium !text-stone-800">{role.name}</TableCell>
+                    <TableCell className="!border-stone-300 !px-4 !py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {role.permissions?.length > 0 ? (
+                          <>
+                            {role.permissions.slice(0, 3).map((p) => <span key={p} className="rounded bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">{p.replace(/_/g, ' ')}</span>)}
+                            {role.permissions.length > 3 && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">+{role.permissions.length - 3} more</span>}
+                          </>
+                        ) : <span className="text-xs text-stone-500">No permissions</span>}
+                      </div>
+                    </TableCell>
+                    {(permissions.includes('update_role') || permissions.includes('delete_role')) && (
+                      <TableCell align="right" className="!border-stone-300 !px-4 !py-3">
+                        <div className="flex justify-end gap-2">
+                          {permissions.includes('update_role') && <button type="button" onClick={() => openEdit(role)} aria-label={`Edit ${role.name}`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200"><Pencil aria-hidden="true" className="h-4 w-4" /></button>}
+                          {permissions.includes('delete_role') && <button type="button" onClick={() => handleDelete(role._id)} aria-label={`Delete ${role.name}`} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-red-100 text-red-700 hover:bg-red-200"><Trash2 aria-hidden="true" className="h-4 w-4" /></button>}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm text-stone-600"><label htmlFor="role-page-size">Rows per page</label><FormControl size="small"><Select id="role-page-size" value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setPage(1) }} aria-label="Rows per page">{[10, 20, 50, 100].map((size) => <MenuItem key={size} value={size}>{size}</MenuItem>)}</Select></FormControl></div>
+            <nav aria-label="Role table pagination" className="flex items-center gap-2">
+              <button type="button" disabled={page === 1 || listLoading} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+              <span className="min-w-20 text-center text-sm text-stone-600">Page <strong className="text-stone-900">{page}</strong> of {Math.max(1, Math.ceil(total / limit))}</span>
+              <button type="button" disabled={page >= Math.ceil(total / limit) || listLoading} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      {showCreate && (
+        <Modal
+          title="Create Role"
+          onClose={closeCreate}
+          onSubmit={handleCreate}
+          loading={createLoading}
+          error={createError}
+        >
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Role Name</label>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="portal-input text-sm"
+              placeholder="e.g. Manager"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-2">Permissions</label>
+            <div className="border border-stone-200 rounded-lg p-4 bg-[#faf8f2]">
+              <PermissionCheckbox
+                selected={form.permissions}
+                onChange={(perms) => setForm({ ...form, permissions: perms })}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showEdit && (
+        <Modal
+          title="Edit Role"
+          onClose={closeEdit}
+          onSubmit={handleUpdate}
+          loading={updateLoading}
+          error={updateError}
+        >
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Role Name</label>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="portal-input text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-2">Permissions</label>
+            <div className="border border-stone-200 rounded-lg p-4 bg-[#faf8f2]">
+              <PermissionCheckbox
+                selected={form.permissions}
+                onChange={(perms) => setForm({ ...form, permissions: perms })}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+export default RolesScreen
