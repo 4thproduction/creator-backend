@@ -29,6 +29,7 @@ import IstDatePicker from "../components/IstDatePicker";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import ImportCreatorsModal from "../components/ImportCreatorsModal";
+import ConfirmModal from "../components/ConfirmModal";
 
 const columns = [
   "Serial No.",
@@ -92,6 +93,7 @@ const CreatorsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [downloadAnchor, setDownloadAnchor] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -172,8 +174,6 @@ const CreatorsScreen = () => {
   }, [loadCreators]);
 
   const remove = async (creator) => {
-    if (!window.confirm(`Delete ${creator.fullName}? This cannot be undone.`))
-      return;
     setBusyId(creator._id);
     setError("");
     try {
@@ -186,6 +186,7 @@ const CreatorsScreen = () => {
       );
     } finally {
       setBusyId(null);
+      setPendingDelete(null);
     }
   };
 
@@ -358,12 +359,6 @@ const CreatorsScreen = () => {
             </div>
           </div>
  
-          {!validRange && (
-            <p role="alert" className="mb-3 text-sm text-red-700">
-              Enter valid dates in dd/mm/yy format, with the start on or before
-              the end.
-            </p>
-          )}
           {error && (
             <p
               role="alert"
@@ -461,7 +456,7 @@ const CreatorsScreen = () => {
                             <button
                               type="button"
                               disabled={busyId === creator._id}
-                              onClick={() => remove(creator)}
+                              onClick={() => setPendingDelete(creator)}
                               aria-label={`Delete ${creator.fullName}`}
                               title="Delete"
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
@@ -525,6 +520,23 @@ const CreatorsScreen = () => {
             </nav>
           </div>
         </main>
+        <ConfirmModal
+          open={Boolean(pendingDelete)}
+          title="Delete creator?"
+          message={
+            pendingDelete && (
+              <>
+                <strong className="text-stone-900">
+                  {pendingDelete.fullName}
+                </strong>{" "}
+                will be permanently deleted. This cannot be undone.
+              </>
+            )
+          }
+          busy={Boolean(pendingDelete) && busyId === pendingDelete._id}
+          onConfirm={() => remove(pendingDelete)}
+          onClose={() => setPendingDelete(null)}
+        />
         <ImportCreatorsModal
           open={importOpen}
           onClose={() => setImportOpen(false)}

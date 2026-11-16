@@ -127,6 +127,7 @@ const ImportCreatorsModal = ({ open, onClose, onImported }) => {
         return;
       }
       let imported = 0;
+      let skipped = 0;
       const failures = [];
       for (let r = 2; r <= sheet.rowCount; r += 1) {
         const row = sheet.getRow(r);
@@ -149,24 +150,31 @@ const ImportCreatorsModal = ({ open, onClose, onImported }) => {
           await axios.post("/api/creators", payload, { withCredentials: true });
           imported += 1;
         } catch (requestError) {
-          failures.push(
-            `Row ${r}: ${requestError.response?.data?.message || "Failed"}`,
-          );
+          if (requestError.response?.status === 409) skipped += 1;
+          else
+            failures.push(
+              `Row ${r}: ${requestError.response?.data?.message || "Failed"}`,
+            );
         }
       }
-      setResult({ imported, failures });
+      setResult({ imported, skipped, failures });
       if (imported) onImported();
-      const plural = (n) => `${n} creator${n === 1 ? "" : "s"}`;
-      if (imported && !failures.length) {
-        toast.success(`${plural(imported)} imported successfully`);
+      const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+      const summary = [
+        imported && `${count(imported, "creator")} imported`,
+        skipped && `${count(skipped, "duplicate")} skipped`,
+        failures.length && `${count(failures.length, "row")} failed`,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      if (failures.length) {
+        toast[imported ? "warning" : "error"](summary);
+      } else if (imported) {
+        toast.success(summary);
         setResult(null);
         onClose();
-      } else if (imported) {
-        toast.warning(
-          `${plural(imported)} imported, ${failures.length} row${failures.length === 1 ? "" : "s"} failed`,
-        );
       } else {
-        toast.error("No creators were imported. Check the errors below.");
+        toast.info("All creators in this file already exist. Nothing new to import.");
       }
     } catch {
       setError("Could not read the file. Please upload a valid .xlsx file.");
@@ -216,7 +224,8 @@ const ImportCreatorsModal = ({ open, onClose, onImported }) => {
         {result && (
           <div role="status" className="rounded-lg bg-stone-50 p-3 text-sm">
             <p className="font-medium text-stone-800">
-              {result.imported} imported, {result.failures.length} failed
+              {result.imported} imported, {result.skipped} skipped as
+              duplicates, {result.failures.length} failed
             </p>
             {result.failures.length > 0 && (
               <ul className="mt-2 max-h-32 list-disc overflow-auto pl-5 text-red-700">

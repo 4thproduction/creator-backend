@@ -11,6 +11,7 @@ import {
 import { AUTH_LOGIN_SUCCESS } from '../constants/authConstants'
 import Sidebar from '../components/Sidebar'
 import Navbar from '../components/Navbar'
+import ConfirmModal from '../components/ConfirmModal'
 import PermissionCheckbox from '../components/PermissionCheckbox'
 
 const Modal = ({ title, onClose, onSubmit, loading, error, children }) => (
@@ -134,10 +135,11 @@ const RolesScreen = () => {
     dispatch(updateRole(selectedRole._id, form))
   }
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this role?')) {
-      dispatch(deleteRole(id))
-    }
+  const [pendingDelete, setPendingDelete] = useState(null)
+
+  const confirmDelete = () => {
+    dispatch(deleteRole(pendingDelete._id))
+    setPendingDelete(null)
   }
 
   const closeCreate = () => {
@@ -210,7 +212,7 @@ const RolesScreen = () => {
                       <TableCell align="right" className="!border-stone-300 !px-4 !py-3">
                         <div className="flex justify-end gap-2">
                           {permissions.includes('update_role') && <button type="button" onClick={() => openEdit(role)} aria-label={`Edit ${role.name}`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200"><Pencil aria-hidden="true" className="h-4 w-4" /></button>}
-                          {permissions.includes('delete_role') && <button type="button" onClick={() => handleDelete(role._id)} aria-label={`Delete ${role.name}`} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-red-100 text-red-700 hover:bg-red-200"><Trash2 aria-hidden="true" className="h-4 w-4" /></button>}
+                          {permissions.includes('delete_role') && <button type="button" onClick={() => setPendingDelete(role)} aria-label={`Delete ${role.name}`} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-red-100 text-red-700 hover:bg-red-200"><Trash2 aria-hidden="true" className="h-4 w-4" /></button>}
                         </div>
                       </TableCell>
                     )}
@@ -290,6 +292,13 @@ const RolesScreen = () => {
           </div>
         </Modal>
       )}
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Delete role?"
+        message={pendingDelete && <><strong className="text-stone-900">{pendingDelete.name}</strong> will be permanently deleted. This cannot be undone.</>}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

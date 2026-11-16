@@ -52,11 +52,13 @@ test('rejects unsupported analytics file types', async () => {
 test('normalizes uploads and prevents public callers from setting protected fields', async (t) => {
   let saved;
   const originalCreate = Creator.create;
+  const originalFindOne = Creator.findOne;
   Creator.create = async (payload) => {
     saved = payload;
     return { _id: 'creator-id' };
   };
-  t.after(() => { Creator.create = originalCreate; });
+  Creator.findOne = () => ({ select: () => ({ lean: async () => null }) });
+  t.after(() => { Creator.create = originalCreate; Creator.findOne = originalFindOne; });
 
   const body = {
     ...validBody(),
@@ -72,4 +74,25 @@ test('normalizes uploads and prevents public callers from setting protected fiel
   assert.equal(saved._id, undefined);
   assert.equal(saved.file_demo.name, 'audience.pdf');
   assert.deepEqual(saved.file_demo.data, Buffer.from('pdf-data'));
+});
+
+test('returns 409 when a creator with the same email or mobile already exists', async (t) => {
+  let query;
+  let created = false;
+  const originalCreate = Creator.create;
+  const originalFindOne = Creator.findOne;
+  Creator.create = async () => { created = true; return { _id: 'new-id' }; };
+  Creator.findOne = (q) => {
+    query = q;
+    return { select: () => ({ lean: async () => ({ email: 'asha@example.com', mobile: '1111111111' }) }) };
+  };
+  t.after(() => { Creator.create = originalCreate; Creator.findOne = originalFindOne; });
+
+  const res = response();
+  await createCreator({ body: { ...validBody(), email: '  ASHA@example.com ' } }, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.match(res.body.message, /email already exists/i);
+  assert.equal(created, false);
+  assert.deepEqual(query.$or, [{ email: 'asha@example.com' }, { mobile: '9999999999' }]);
 });
