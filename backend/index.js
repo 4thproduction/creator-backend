@@ -24,6 +24,14 @@ app.use(cors((req, callback) => callback(null, req.path === '/api/creators/appli
   ? { origin: '*' }
   : { origin: (origin, done) => done(null, !origin || allowedOrigins().includes(origin)), credentials: true })));
 app.use(sessionSecurity);
+// API responses carry personal data and session state: never let the browser
+// cache them or answer from a stale copy (304), which previously served an old
+// HTML response in place of /api/creators.
+app.set('etag', false);
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 // Creator applications contain base64 analytics screenshots. Keep a bounded limit.
 app.use(express.json({ limit: '22mb' }));
 
