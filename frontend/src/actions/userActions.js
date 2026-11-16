@@ -14,7 +14,6 @@ import {
   USER_DELETE_FAIL,
 } from "../constants/userConstants";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const getConfig = () => ({
   withCredentials: true,
@@ -25,7 +24,7 @@ export const listUsers =
   async (dispatch) => {
     try {
       dispatch({ type: USER_LIST_REQUEST });
-      const { data } = await axios.get(`${API_URL}/api/users`, {
+      const { data } = await axios.get(`/api/users`, {
         ...getConfig(),
         params: { page, limit },
       });
@@ -42,7 +41,7 @@ export const createUser = (userData) => async (dispatch) => {
   try {
     dispatch({ type: USER_CREATE_REQUEST });
     const { data } = await axios.post(
-      `${API_URL}/api/users`,
+      `/api/users`,
       userData,
       getConfig(),
     );
@@ -59,7 +58,7 @@ export const updateUser = (id, userData) => async (dispatch) => {
   try {
     dispatch({ type: USER_UPDATE_REQUEST });
     const { data } = await axios.put(
-      `${API_URL}/api/users/${id}`,
+      `/api/users/${id}`,
       userData,
       getConfig(),
     );
@@ -75,7 +74,7 @@ export const updateUser = (id, userData) => async (dispatch) => {
 export const deleteUser = (id) => async (dispatch) => {
   try {
     dispatch({ type: USER_DELETE_REQUEST });
-    await axios.delete(`${API_URL}/api/users/${id}`, getConfig());
+    await axios.delete(`/api/users/${id}`, getConfig());
     dispatch({ type: USER_DELETE_SUCCESS });
   } catch (error) {
     dispatch({

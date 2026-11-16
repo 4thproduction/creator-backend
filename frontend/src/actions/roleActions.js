@@ -14,7 +14,6 @@ import {
   ROLE_DELETE_FAIL,
 } from "../constants/roleConstants";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const getConfig = () => ({
   withCredentials: true,
@@ -23,7 +22,7 @@ const getConfig = () => ({
 export const listRoles = (page, limit) => async (dispatch) => {
   try {
     dispatch({ type: ROLE_LIST_REQUEST });
-    const { data } = await axios.get(`${API_URL}/api/roles`, {
+    const { data } = await axios.get(`/api/roles`, {
       ...getConfig(),
       ...(page !== undefined ? { params: { page, limit } } : {}),
     });
@@ -40,7 +39,7 @@ export const createRole = (roleData) => async (dispatch) => {
   try {
     dispatch({ type: ROLE_CREATE_REQUEST });
     const { data } = await axios.post(
-      `${API_URL}/api/roles`,
+      `/api/roles`,
       roleData,
       getConfig(),
     );
@@ -57,7 +56,7 @@ export const updateRole = (id, roleData) => async (dispatch) => {
   try {
     dispatch({ type: ROLE_UPDATE_REQUEST });
     const { data } = await axios.put(
-      `${API_URL}/api/roles/${id}`,
+      `/api/roles/${id}`,
       roleData,
       getConfig(),
     );
@@ -73,7 +72,7 @@ export const updateRole = (id, roleData) => async (dispatch) => {
 export const deleteRole = (id) => async (dispatch) => {
   try {
     dispatch({ type: ROLE_DELETE_REQUEST });
-    await axios.delete(`${API_URL}/api/roles/${id}`, getConfig());
+    await axios.delete(`/api/roles/${id}`, getConfig());
     dispatch({ type: ROLE_DELETE_SUCCESS });
   } catch (error) {
     dispatch({

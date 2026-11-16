@@ -33,7 +33,6 @@ import IstDatePicker from "../components/IstDatePicker";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const GOLD = "#aa8241";
 const INK = "#292521";
 const PALETTE = [GOLD, "#333331", "#788390", "#b9b9b5"];
@@ -143,7 +142,7 @@ const DashboardScreen = () => {
     if (!canReadCreators) return;
     let active = true;
     axios
-      .get(`${API_URL}/api/creators/analytics`, {
+      .get(`/api/creators/analytics`, {
         withCredentials: true,
       })
       .then(({ data }) => {

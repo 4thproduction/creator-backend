@@ -28,7 +28,6 @@ import IstDatePicker from "../components/IstDatePicker";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const columns = [
   "Serial No.",
   "Creator",
@@ -126,7 +125,7 @@ const CreatorsScreen = () => {
     setLoading(true);
     setError("");
     try {
-      const { data } = await axios.get(`${API_URL}/api/creators`, {
+      const { data } = await axios.get(`/api/creators`, {
         ...config,
         params: {
           page,
@@ -175,7 +174,7 @@ const CreatorsScreen = () => {
     setBusyId(creator._id);
     setError("");
     try {
-      await axios.delete(`${API_URL}/api/creators/${creator._id}`, config);
+      await axios.delete(`/api/creators/${creator._id}`, config);
       if (creators.length === 1 && page > 1) setPage(page - 1);
       else await loadCreators();
     } catch (requestError) {
@@ -192,7 +191,7 @@ const CreatorsScreen = () => {
     setError("");
     try {
       const response = await axios.get(
-        `${API_URL}/api/creators/export/${format}`,
+        `/api/creators/export/${format}`,
         {
           ...config,
           params: { ...filters, from: fromDate, to: toDate },

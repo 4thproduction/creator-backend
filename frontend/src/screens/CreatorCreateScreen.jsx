@@ -7,7 +7,6 @@ import { Alert, Snackbar } from '@mui/material'
 import Sidebar from '../components/Sidebar'
 import Navbar from '../components/Navbar'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const categories = ['Travel', 'Food', 'Fashion', 'Luxury Lifestyle', 'Beauty', 'Wellness', 'Parenting', 'Hospitality', 'Business', 'Technology', 'Entertainment', 'Photography', 'Other']
 const collaborations = ['Barter Collaborations', 'Paid Collaborations', 'Affiliate Collaborations', 'Event Invitations', 'Brand Ambassadorships', 'Long-Term Partnerships']
 const capabilities = ['Reels', 'Static Posts', 'Stories', 'Carousels', 'YouTube Shorts', 'Long-form Videos', 'Blog Articles', 'Photography', 'Drone Videos', 'Product Reviews', 'UGC Content']
@@ -68,7 +67,7 @@ const CreatorCreateScreen = () => {
 
   useEffect(() => {
     if (!isEditing) return
-    axios.get(`${API_URL}/api/creators/${id}`, { withCredentials: true })
+    axios.get(`/api/creators/${id}`, { withCredentials: true })
       .then(({ data }) => {
         const clean = { ...data }
         for (const key of ['_id', '__v', 'createdAt', 'updatedAt', 'file_insights', 'file_demo', 'file_reach']) delete clean[key]
@@ -124,8 +123,8 @@ const CreatorCreateScreen = () => {
       for (const [, key] of uploads) if (files[key]) payload[key] = await toBase64(files[key])
       const config = { withCredentials: true }
       const { data } = isEditing
-        ? await axios.put(`${API_URL}/api/creators/${id}`, payload, config)
-        : await axios.post(`${API_URL}/api/creators`, payload, config)
+        ? await axios.put(`/api/creators/${id}`, payload, config)
+        : await axios.post(`/api/creators`, payload, config)
       if (!isEditing) sessionStorage.removeItem(DRAFT_KEY)
       navigate(`/creators/${data.id}`)
     } catch (requestError) {

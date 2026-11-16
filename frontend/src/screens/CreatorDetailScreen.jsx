@@ -7,7 +7,6 @@ import { formatIstDate } from "../utils/istDates";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const sections = [
   [
@@ -174,7 +173,7 @@ const CreatorDetailScreen = () => {
     setLoading(true);
     setError("");
     axios
-      .get(`${API_URL}/api/creators/${id}`, config)
+      .get(`/api/creators/${id}`, config)
       .then(({ data }) => {
         if (active) setCreator(data);
       })
@@ -198,7 +197,7 @@ const CreatorDetailScreen = () => {
     setDownloading(field);
     try {
       const response = await axios.get(
-        `${API_URL}/api/creators/${id}/files/${field}`,
+        `/api/creators/${id}/files/${field}`,
         { ...config, responseType: "blob" },
       );
       const url = URL.createObjectURL(response.data);
